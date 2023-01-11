@@ -1,0 +1,13 @@
+[project]
+name = "change_wheel_version"
+version = "0.1.0"
+description = "Change the version of a wheel file"
+requires-python = ">=3.8"
+dependencies = ["wheel", "installer", "packaging"]
+
+[project.scripts]
+change_wheel_version = "change_wheel_version:main"
+
+[build-system]
+requires = ["flit_core>=3.4"]
+build-backend = "flit_core.buildapi"
