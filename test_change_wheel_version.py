@@ -17,10 +17,10 @@ PYP_V1_WHEEL = "https://files.pythonhosted.org/packages/ad/c2/92fa4ab416c7f697a2
 
 
 def test_change_wheel_version() -> None:
-    assert sys.version_info >= (3, 8)
+    assert sys.version_info >= (3, 9)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
+    with tempfile.TemporaryDirectory() as _tmpdir:
+        tmpdir = Path(_tmpdir)
 
         original_wheel = tmpdir / Path(PYP_V1_WHEEL).name
         urllib.request.urlretrieve(PYP_V1_WHEEL, original_wheel)
@@ -54,11 +54,11 @@ def test_change_wheel_version() -> None:
         assert get_installed_version(python) == b"3.0.0+yikes"
 
 
-def test_change_wheel_version_installer():
-    assert sys.version_info >= (3, 8)
+def test_change_wheel_version_installer() -> None:
+    assert sys.version_info >= (3, 9)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
+    with tempfile.TemporaryDirectory() as _tmpdir:
+        tmpdir = Path(_tmpdir)
 
         original_wheel = tmpdir / Path(PYP_V1_WHEEL).name
         urllib.request.urlretrieve(PYP_V1_WHEEL, original_wheel)

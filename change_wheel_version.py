@@ -5,13 +5,13 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import installer.utils
 import packaging.version
 
 
-def version_replace(v: packaging.version.Version, **kwargs) -> packaging.version.Version:
+def version_replace(v: packaging.version.Version, **kwargs: Any) -> packaging.version.Version:
     # yikes :-)
     self = packaging.version.Version.__new__(packaging.version.Version)
     self._version = v._version._replace(**kwargs)
@@ -42,8 +42,8 @@ def change_wheel_version(wheel: Path, version: Optional[str], local_version: Opt
     new_wheel_name = "-".join(p for p in new_parts if p) + ".whl"
     new_wheel = wheel.with_name(new_wheel_name)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
+    with tempfile.TemporaryDirectory() as _tmpdir:
+        tmpdir = Path(_tmpdir)
         dest_dir = tmpdir / "wheel"
 
         subprocess.check_call(
