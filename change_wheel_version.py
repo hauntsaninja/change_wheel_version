@@ -46,7 +46,7 @@ def change_wheel_version(wheel: Path, version: Optional[str], local_version: Opt
         tmpdir = Path(_tmpdir)
         dest_dir = tmpdir / "wheel"
 
-        subprocess.check_call(
+        subprocess.check_output(
             [sys.executable, "-m", "wheel", "unpack", "-d", str(dest_dir), str(wheel)]
         )
 
@@ -78,7 +78,7 @@ def change_wheel_version(wheel: Path, version: Optional[str], local_version: Opt
             f.write(msg.as_bytes())
 
         # wheel pack rewrites the RECORD file
-        subprocess.check_call(
+        subprocess.check_output(
             [
                 sys.executable,
                 "-m",
@@ -99,9 +99,13 @@ def main() -> None:
     parser.add_argument("wheel", type=Path)
     parser.add_argument("--local-version")
     parser.add_argument("--version")
+    parser.add_argument("--delete-old-wheel", action="store_true")
     args = parser.parse_args()
 
-    change_wheel_version(args.wheel, args.version, args.local_version)
+    new_wheel = change_wheel_version(args.wheel, args.version, args.local_version)
+    print(new_wheel)
+    if args.delete_old_wheel:
+        args.wheel.unlink()
 
 
 if __name__ == "__main__":
