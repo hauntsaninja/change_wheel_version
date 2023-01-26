@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.3.0]
+- Add `--allow-same-version` to allow building a wheel with the same version as the old one
+
 ## [v0.2.0]
 - Print filename of new wheel, swallow logs from subprocesses
 - Add `--delete-old-wheel` to delete the old wheel
