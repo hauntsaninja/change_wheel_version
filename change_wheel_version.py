@@ -18,17 +18,24 @@ def version_replace(v: packaging.version.Version, **kwargs: Any) -> packaging.ve
     return packaging.version.Version(str(self))
 
 
-def change_wheel_version(wheel: Path, version: Optional[str], local_version: Optional[str]) -> Path:
+def change_wheel_version(
+    wheel: Path,
+    version: Optional[str],
+    local_version: Optional[str],
+    allow_same_version: bool = False,
+) -> Path:
     old_parts = installer.utils.parse_wheel_filename(wheel.name)
     old_version = packaging.version.Version(old_parts.version)
     distribution = old_parts.distribution
 
     if version is None:
+        # just replace the local version
         assert local_version is not None
         new_version = version_replace(
             old_version, local=packaging.version._parse_local_version(local_version)
         )
     else:
+        # replace the base version and (possibly) the local version
         new_version = packaging.version.Version(version)
         assert not new_version.local
         if local_version:
@@ -36,7 +43,10 @@ def change_wheel_version(wheel: Path, version: Optional[str], local_version: Opt
                 new_version, local=packaging.version._parse_local_version(local_version)
             )
 
-    assert new_version != old_version
+    if version == old_version:
+        if allow_same_version:
+            return wheel
+        raise ValueError(f"Version {version} is the same as the old version")
 
     new_parts = old_parts._replace(version=str(new_version))
     new_wheel_name = "-".join(p for p in new_parts if p) + ".whl"
@@ -100,9 +110,15 @@ def main() -> None:
     parser.add_argument("--local-version")
     parser.add_argument("--version")
     parser.add_argument("--delete-old-wheel", action="store_true")
+    parser.add_argument("--allow-same-version", action="store_true")
     args = parser.parse_args()
 
-    new_wheel = change_wheel_version(args.wheel, args.version, args.local_version)
+    new_wheel = change_wheel_version(
+        wheel=args.wheel,
+        version=args.version,
+        local_version=args.local_version,
+        allow_same_version=args.allow_same_version,
+    )
     print(new_wheel)
     if args.delete_old_wheel:
         args.wheel.unlink()
