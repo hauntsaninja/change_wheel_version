@@ -16,7 +16,7 @@ def get_installed_version(python: Path, dist: str = "pypyp") -> bytes:
 PYP_V1_WHEEL = "https://files.pythonhosted.org/packages/ad/c2/92fa4ab416c7f697a2944d54c6e58ed5d043e296f6f671af32aaacb4b40e/pypyp-1.0.0-py3-none-any.whl"  # noqa: E501
 
 
-def test_change_wheel_version() -> None:
+def test_change_wheel_version_pip() -> None:
     assert sys.version_info >= (3, 9)
 
     with tempfile.TemporaryDirectory() as _tmpdir:
@@ -70,6 +70,6 @@ def test_change_wheel_version_installer() -> None:
         subprocess.check_call([pip, "install", "--upgrade", "pip", "installer"])
 
         changed_wheel = change_wheel_version.change_wheel_version(original_wheel, None, "yikes")
-        subprocess.check_call([pip, "install", changed_wheel])
+        subprocess.check_call([python, "-m", "installer", changed_wheel])
 
         assert get_installed_version(python) == b"1.0.0+yikes"
