@@ -1,5 +1,6 @@
 import argparse
 import email.parser
+import email.policy
 import shutil
 import subprocess
 import sys
@@ -80,10 +81,22 @@ def change_wheel_version(
             )
 
         metadata = dest_dir / new_slug / f"{new_slug}.dist-info" / "METADATA"
+
+        # This is actually a non-conformant email policy as per
+        # https://packaging.python.org/en/latest/specifications/core-metadata/
+        # However, it works around this bug in setuptools in cases where the version is really long
+        # https://github.com/pypa/setuptools/issues/3808
+        max_line_length = 200
+        policy = email.policy.compat32.clone(max_line_length=200)
+        version_str = str(new_version)
+        if len(version_str) >= max_line_length:
+            raise ValueError(f"Version {version_str} is too long")
+
         with open(metadata, "rb") as f:
-            parser = email.parser.BytesParser()
+            parser = email.parser.BytesParser(policy=policy)
             msg = parser.parse(f)
-        msg.replace_header("Version", str(new_version))
+
+        msg.replace_header("Version", version_str)
         with open(metadata, "wb") as f:
             f.write(msg.as_bytes())
 

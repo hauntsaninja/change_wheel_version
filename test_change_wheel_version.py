@@ -53,6 +53,13 @@ def test_change_wheel_version_pip() -> None:
         subprocess.check_call([pip, "install", changed_wheel])
         assert get_installed_version(python) == b"3.0.0+yikes"
 
+        # change the wheel but with a long version
+        version = "super.long.version.string.that.is.longer.than.sixty.eight.characters.even.eighty"
+        assert len(version) == 80
+        changed_wheel = change_wheel_version.change_wheel_version(original_wheel, "1", version)
+        subprocess.check_call([pip, "install", changed_wheel])
+        assert get_installed_version(python) == b"1+" + version.encode("utf-8")
+
 
 def test_change_wheel_version_installer() -> None:
     assert sys.version_info >= (3, 9)
@@ -69,7 +76,14 @@ def test_change_wheel_version_installer() -> None:
 
         subprocess.check_call([pip, "install", "--upgrade", "pip", "installer"])
 
+        # change the wheel
         changed_wheel = change_wheel_version.change_wheel_version(original_wheel, None, "yikes")
         subprocess.check_call([python, "-m", "installer", changed_wheel])
-
         assert get_installed_version(python) == b"1.0.0+yikes"
+
+        # change the wheel but with a long version
+        version = "super.long.version.string.that.is.longer.than.sixty.eight.characters.even.eighty"
+        assert len(version) == 80
+        changed_wheel = change_wheel_version.change_wheel_version(original_wheel, "1", version)
+        subprocess.check_call([pip, "install", changed_wheel])
+        assert get_installed_version(python) == b"1+" + version.encode("utf-8")
