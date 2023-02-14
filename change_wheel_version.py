@@ -1,12 +1,14 @@
 import argparse
 import email.parser
 import email.policy
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, no_type_check
 
 import installer.utils
 import packaging.version
@@ -17,6 +19,31 @@ def version_replace(v: packaging.version.Version, **kwargs: Any) -> packaging.ve
     self = packaging.version.Version.__new__(packaging.version.Version)
     self._version = v._version._replace(**kwargs)
     return packaging.version.Version(str(self))
+
+
+class ExecutablePreservingZipfile(zipfile.ZipFile):
+    @no_type_check
+    def _extract_member(self, member, targetpath, pwd):
+        if not isinstance(member, zipfile.ZipInfo):
+            member = self.getinfo(member)
+
+        targetpath = super()._extract_member(member, targetpath, pwd)
+
+        mode = member.external_attr >> 16
+        if mode != 0:
+            os.chmod(targetpath, mode)
+        return targetpath
+
+
+def wheel_unpack(wheel: Path, dest_dir: Path, name_ver: str) -> None:
+    # This is the moral equivalent of:
+    # subprocess.check_output(
+    #     [sys.executable, "-m", "wheel", "unpack", "-d", str(dest_dir), str(wheel)]
+    # )
+    # Except we need to preserve permissions
+    # https://github.com/pypa/wheel/issues/505
+    with ExecutablePreservingZipfile(wheel) as wf:
+        wf.extractall(dest_dir / name_ver)
 
 
 def change_wheel_version(
@@ -57,9 +84,7 @@ def change_wheel_version(
         tmpdir = Path(_tmpdir)
         dest_dir = tmpdir / "wheel"
 
-        subprocess.check_output(
-            [sys.executable, "-m", "wheel", "unpack", "-d", str(dest_dir), str(wheel)]
-        )
+        wheel_unpack(wheel, dest_dir, f"{distribution}-{old_version}")
 
         old_slug = f"{distribution}-{old_version}"
         new_slug = f"{distribution}-{new_version}"
@@ -113,7 +138,11 @@ def change_wheel_version(
             ]
         )
 
-    assert new_wheel.exists()
+    if not new_wheel.exists():
+        raise RuntimeError(
+            f"Failed to create new wheel {new_wheel}\n"
+            f"Directory contents: {list(wheel.parent.iterdir())}"
+        )
     return new_wheel
 
 

@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import tempfile
@@ -92,3 +93,33 @@ def test_change_wheel_version_installer() -> None:
         changed_wheel = change_wheel_version.change_wheel_version(original_wheel, "1", version)
         subprocess.check_call([python, "-m", "installer", changed_wheel])
         assert get_installed_version(python) == b"1+" + version.encode("utf-8")
+
+
+def test_preserves_permissions() -> None:
+    with tempfile.TemporaryDirectory() as _tmpdir:
+        tmpdir = Path(_tmpdir)
+
+        venv.create(tmpdir / "venv", with_pip=True, clear=True)
+        pip = tmpdir / "venv" / "bin" / "pip"
+        python = tmpdir / "venv" / "bin" / "python"
+
+        subprocess.check_call([pip, "install", "--upgrade", "pip"])
+
+        subprocess.check_call([pip, "wheel", "regex==2022.10.31", "-w", str(tmpdir)])
+        original_wheel = list(tmpdir.glob("regex-*.whl"))[0]
+
+        subprocess.check_call([pip, "install", original_wheel])
+        assert get_installed_version(python, dist="regex") == b"2022.10.31"
+
+        executable_files_before = [
+            p for p in (tmpdir / "venv/lib").rglob("*") if p.is_file() and os.access(p, os.X_OK)
+        ]
+
+        changed_wheel = change_wheel_version.change_wheel_version(original_wheel, None, "yikes")
+        subprocess.check_call([pip, "install", changed_wheel])
+        assert get_installed_version(python, dist="regex") == b"2022.10.31+yikes"
+
+        executable_files_after = [
+            p for p in (tmpdir / "venv/lib").rglob("*") if p.is_file() and os.access(p, os.X_OK)
+        ]
+        assert executable_files_before == executable_files_after
