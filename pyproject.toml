@@ -1,6 +1,6 @@
 [project]
 name = "change_wheel_version"
-version = "0.4.0"
+version = "0.5.0"
 description = "Change the version of a wheel file"
 requires-python = ">=3.9"
 dependencies = ["wheel", "installer", "packaging"]

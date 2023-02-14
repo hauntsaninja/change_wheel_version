@@ -1,7 +1,11 @@
 # Changelog
 
+## [v0.5.0]
+- Work around the fact `wheel unpack` does not preserve permissions
+- Avoid defensive check trigged by `wheel pack` sorting tags when reconstructing the wheel
+
 ## [v0.4.0]
-- Workaround a bug in `setuptools` involving really long versions when parsing `METADATA` files
+- Work around a bug in `setuptools` involving really long versions when parsing `METADATA` files
 
 ## [v0.3.0]
 - Add `--allow-same-version` to allow building a wheel with the same version as the old one
