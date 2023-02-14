@@ -76,10 +76,6 @@ def change_wheel_version(
             return wheel
         raise ValueError(f"Version {version} is the same as the old version")
 
-    new_parts = old_parts._replace(version=str(new_version))
-    new_wheel_name = "-".join(p for p in new_parts if p) + ".whl"
-    new_wheel = wheel.with_name(new_wheel_name)
-
     with tempfile.TemporaryDirectory() as _tmpdir:
         tmpdir = Path(_tmpdir)
         dest_dir = tmpdir / "wheel"
@@ -137,6 +133,12 @@ def change_wheel_version(
                 str(dest_dir / new_slug),
             ]
         )
+
+    # wheel pack sorts the tag, so we need to do the same
+    new_tag = "-".join(".".join(sorted(t.split("."))) for t in old_parts.tag.split("-"))
+    new_parts = old_parts._replace(version=str(new_version), tag=new_tag)
+    new_wheel_name = "-".join(p for p in new_parts if p) + ".whl"
+    new_wheel = wheel.with_name(new_wheel_name)
 
     if not new_wheel.exists():
         raise RuntimeError(
