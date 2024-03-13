@@ -138,8 +138,9 @@ def change_wheel_version(
             f.write(msg.as_bytes())
 
         with open(dest_dir / new_slug / f"{new_slug}.dist-info" / "WHEEL", "rb") as f:
-            parser = email.parser.BytesParser(policy=email.policy.compat32).parse(f)
-            WHEEL_tags: list[str] = parser.get_all("Tag", [])
+            parser = email.parser.BytesParser(policy=email.policy.compat32)
+            msg = parser.parse(f)
+            WHEEL_tags: list[str] = msg.get_all("Tag", [])
 
         # wheel pack rewrites the RECORD file
         subprocess.check_output(
