@@ -46,6 +46,22 @@ def wheel_unpack(wheel: Path, dest_dir: Path, name_ver: str) -> None:
         wf.extractall(dest_dir / name_ver)
 
 
+def validate_WHEEL_tags(filename_tag: str, WHEEL_tags: list[str]) -> None:
+    # Compare to logic in wheel.cli.pack.compute_tagline
+    w_impls = {tag.split("-")[0] for tag in WHEEL_tags}
+    w_abivers = {tag.split("-")[1] for tag in WHEEL_tags}
+    w_platforms = {tag.split("-")[2] for tag in WHEEL_tags}
+
+    f_impl, f_abi, f_platform = filename_tag.split("-")
+    f_impls = set(f_impl.split("."))
+    f_abivers = set(f_abi.split("."))
+    f_platforms = set(f_platform.split("."))
+
+    assert w_impls == set(f_impls), (filename_tag, WHEEL_tags)
+    assert w_abivers == set(f_abivers), (filename_tag, WHEEL_tags)
+    assert w_platforms == set(f_platforms), (filename_tag, WHEEL_tags)
+
+
 def change_wheel_version(
     wheel: Path,
     version: Optional[str],
@@ -121,6 +137,10 @@ def change_wheel_version(
         with open(metadata, "wb") as f:
             f.write(msg.as_bytes())
 
+        with open(dest_dir / new_slug / f"{new_slug}.dist-info" / "WHEEL", "rb") as f:
+            parser = email.parser.BytesParser(policy=email.policy.compat32).parse(f)
+            WHEEL_tags: list[str] = parser.get_all("Tag", [])
+
         # wheel pack rewrites the RECORD file
         subprocess.check_output(
             [
@@ -135,6 +155,8 @@ def change_wheel_version(
         )
 
     # wheel pack sorts the tag, so we need to do the same
+    # see wheel.cli.pack.compute_tagline
+    validate_WHEEL_tags(old_parts.tag, WHEEL_tags)
     new_tag = "-".join(".".join(sorted(t.split("."))) for t in old_parts.tag.split("-"))
     new_parts = old_parts._replace(version=str(new_version), tag=new_tag)
     new_wheel_name = "-".join(p for p in new_parts if p) + ".whl"
