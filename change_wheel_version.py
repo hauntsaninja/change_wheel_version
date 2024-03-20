@@ -12,7 +12,7 @@ from typing import Any, Optional, no_type_check
 
 import installer.utils
 import packaging.version
-import wheel.cli.pack as wheel_cli_pack
+import wheel.cli.pack as wheel_cli_pack  # type: ignore[import-untyped]
 
 
 def version_replace(v: packaging.version.Version, **kwargs: Any) -> packaging.version.Version:
