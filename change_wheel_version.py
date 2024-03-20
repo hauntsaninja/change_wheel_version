@@ -12,6 +12,7 @@ from typing import Any, Optional, no_type_check
 
 import installer.utils
 import packaging.version
+import wheel.cli.pack as wheel_cli_pack
 
 
 def version_replace(v: packaging.version.Version, **kwargs: Any) -> packaging.version.Version:
@@ -57,9 +58,8 @@ def validate_WHEEL_tags(filename_tag: str, WHEEL_tags: list[str]) -> None:
     f_abivers = set(f_abi.split("."))
     f_platforms = set(f_platform.split("."))
 
-    assert w_impls == set(f_impls), (filename_tag, WHEEL_tags)
-    assert w_abivers == set(f_abivers), (filename_tag, WHEEL_tags)
-    assert w_platforms == set(f_platforms), (filename_tag, WHEEL_tags)
+    if w_impls != set(f_impls) or w_abivers != set(f_abivers) or w_platforms != set(f_platforms):
+        raise ValueError(f"Wheel tag mismatch: {filename_tag} vs {WHEEL_tags}\n")
 
 
 def change_wheel_version(
@@ -155,11 +155,16 @@ def change_wheel_version(
             ]
         )
 
-    # wheel pack sorts the tag, so we need to do the same
-    # see wheel.cli.pack.compute_tagline
+    # wheel pack sorts the tags in WHEEL, so we need to do the same to figure out where the new
+    # wheel is. But first validate the tags from WHEEL against the tags from the old filename
+    # Note this probably doesn't handle build numbers correctly
+    # Note this logic is more complicated than it should be, since build backends like maturin
+    # don't seem to produce spec compliant WHEEL files. See issue #2
+    # Note this is maybe all unnecessary, we could just glob and do a loose match
     validate_WHEEL_tags(old_parts.tag, WHEEL_tags)
-    new_tag = "-".join(".".join(sorted(t.split("."))) for t in old_parts.tag.split("-"))
-    new_parts = old_parts._replace(version=str(new_version), tag=new_tag)
+    new_tagline = wheel_cli_pack.compute_tagline(WHEEL_tags)
+
+    new_parts = old_parts._replace(version=str(new_version), tag=new_tagline)
     new_wheel_name = "-".join(p for p in new_parts if p) + ".whl"
     new_wheel = wheel.with_name(new_wheel_name)
 
