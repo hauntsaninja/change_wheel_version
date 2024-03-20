@@ -12,6 +12,7 @@ from typing import Any, Optional, no_type_check
 
 import installer.utils
 import packaging.version
+import wheel.cli.pack as wheel_cli_pack  # type: ignore[import-untyped]
 
 
 def version_replace(v: packaging.version.Version, **kwargs: Any) -> packaging.version.Version:
@@ -44,6 +45,21 @@ def wheel_unpack(wheel: Path, dest_dir: Path, name_ver: str) -> None:
     # https://github.com/pypa/wheel/issues/505
     with ExecutablePreservingZipfile(wheel) as wf:
         wf.extractall(dest_dir / name_ver)
+
+
+def validate_WHEEL_tags(filename_tag: str, WHEEL_tags: list[str]) -> None:
+    # Compare to logic in wheel.cli.pack.compute_tagline
+    w_impls = {tag.split("-")[0] for tag in WHEEL_tags}
+    w_abivers = {tag.split("-")[1] for tag in WHEEL_tags}
+    w_platforms = {tag.split("-")[2] for tag in WHEEL_tags}
+
+    f_impl, f_abi, f_platform = filename_tag.split("-")
+    f_impls = set(f_impl.split("."))
+    f_abivers = set(f_abi.split("."))
+    f_platforms = set(f_platform.split("."))
+
+    if w_impls != set(f_impls) or w_abivers != set(f_abivers) or w_platforms != set(f_platforms):
+        raise ValueError(f"Wheel tag mismatch: {filename_tag} vs {WHEEL_tags}\n")
 
 
 def change_wheel_version(
@@ -121,6 +137,11 @@ def change_wheel_version(
         with open(metadata, "wb") as f:
             f.write(msg.as_bytes())
 
+        with open(dest_dir / new_slug / f"{new_slug}.dist-info" / "WHEEL", "rb") as f:
+            parser = email.parser.BytesParser(policy=email.policy.compat32)
+            msg = parser.parse(f)
+            WHEEL_tags: list[str] = msg.get_all("Tag", [])
+
         # wheel pack rewrites the RECORD file
         subprocess.check_output(
             [
@@ -134,9 +155,16 @@ def change_wheel_version(
             ]
         )
 
-    # wheel pack sorts the tag, so we need to do the same
-    new_tag = "-".join(".".join(sorted(t.split("."))) for t in old_parts.tag.split("-"))
-    new_parts = old_parts._replace(version=str(new_version), tag=new_tag)
+    # wheel pack sorts the tags in WHEEL, so we need to do the same to figure out where the new
+    # wheel is. But first validate the tags from WHEEL against the tags from the old filename
+    # Note this probably doesn't handle build numbers correctly
+    # Note this logic is more complicated than it should be, since build backends like maturin
+    # don't seem to produce spec compliant WHEEL files. See issue #2
+    # Note this is maybe all unnecessary, we could just glob and do a loose match
+    validate_WHEEL_tags(old_parts.tag, WHEEL_tags)
+    new_tagline = wheel_cli_pack.compute_tagline(WHEEL_tags)
+
+    new_parts = old_parts._replace(version=str(new_version), tag=new_tagline)
     new_wheel_name = "-".join(p for p in new_parts if p) + ".whl"
     new_wheel = wheel.with_name(new_wheel_name)
 
