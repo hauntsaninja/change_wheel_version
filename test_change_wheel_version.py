@@ -4,7 +4,12 @@ import sys
 import tempfile
 import urllib.request
 import venv
+from email import message_from_bytes
+from email.message import Message
 from pathlib import Path
+
+import pytest
+from packaging import tags
 
 import change_wheel_version
 
@@ -12,6 +17,15 @@ import change_wheel_version
 def get_installed_version(python: Path, dist: str = "pypyp") -> bytes:
     prog = f"import importlib.metadata; print(importlib.metadata.version('{dist}'))"
     return subprocess.check_output([python, "-c", prog]).strip()
+
+
+def get_wheel_metadata(python: Path, dist: str) -> Message:
+    prog = (
+        "import importlib.metadata; "
+        + f" print(importlib.metadata.distribution('{dist}').read_text('WHEEL'))"
+    )
+    wheel_metadata = subprocess.check_output([python, "-c", prog], text=False).strip()
+    return message_from_bytes(wheel_metadata)
 
 
 # PyPI in practice doesn't break links. They do make this pretty redirect available too.
@@ -123,3 +137,45 @@ def test_preserves_permissions() -> None:
             p for p in (tmpdir / "venv/lib").rglob("*") if p.is_file() and os.access(p, os.X_OK)
         ]
         assert executable_files_before == executable_files_after
+
+
+def test_change_platform() -> None:
+    with tempfile.TemporaryDirectory() as _tmpdir:
+        tmpdir = Path(_tmpdir)
+
+        original_wheel = tmpdir / Path(PYP_V1_WHEEL).name
+        urllib.request.urlretrieve(PYP_V1_WHEEL, original_wheel)
+
+        venv.create(tmpdir / "venv", with_pip=True, clear=True)
+        pip = tmpdir / "venv" / "bin" / "pip"
+        python = tmpdir / "venv" / "bin" / "python"
+
+        subprocess.check_call([pip, "install", "--upgrade", "pip"])
+
+        # This is an arbitrary platform-dependent tag. Anything valid other than "py3-none-any"
+        # (which pypyp has) would be fine for testing.
+        binary_tag = str(next(tags.sys_tags()))
+        assert "none" not in binary_tag
+
+        # Change the wheel to have a platform tag of `binary_tag` and install it.
+        changed_wheel = change_wheel_version.change_wheel_version(
+            original_wheel, version=None, local_version=None, platform_tag=binary_tag
+        )
+        subprocess.check_call([pip, "install", changed_wheel])
+
+        # The original was pure python. Check that, as installed, it is platform-specific.
+        wheel_metadata = get_wheel_metadata(python, "pypyp")
+        assert wheel_metadata["Tag"] == binary_tag
+        assert wheel_metadata["Root-Is-Purelib"] == "false"
+
+        # Check that a suitable error is raised with an internally-inconsistent platform tag.
+        with pytest.raises(ValueError, match="ABI and platform are inconsistent"):
+            change_wheel_version.change_wheel_version(
+                original_wheel, version=None, local_version=None, platform_tag="cp311-cp311-any"
+            )
+
+        # Check that a suitable error is raised with an unparseable platform tag.
+        with pytest.raises(ValueError, match=r"too many values to unpack \(expected 3\)"):
+            change_wheel_version.change_wheel_version(
+                original_wheel, version=None, local_version=None, platform_tag="py3-none-any-some"
+            )
