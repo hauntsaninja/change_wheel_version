@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.6.0]
+- Add a `--platform-tag` option to change the platform tag of a wheel
+
 ## [v0.5.0]
 - Work around the fact `wheel unpack` does not preserve permissions
 - Avoid defensive check trigged by `wheel pack` sorting tags when reconstructing the wheel
